@@ -19,7 +19,7 @@
 #include "ScopedSourceControlProgress.h"
 #include "SourceControlHelpers.h"
 #include "SourceControlOperations.h"
-#include "IPluginManager.h"
+#include "Interfaces/IPluginManager.h"
 
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
@@ -69,6 +69,35 @@ void FGitSourceControlProvider::CheckGitAvailability()
 	{
 		bGitAvailable = false;
 	}
+}
+
+bool FGitSourceControlProvider::CheckIfValidRepository(const FString& InPathToGitBinary, const FString& InPathToGitRepo)
+{
+	const FString PathToRepo = FPaths::ConvertRelativePathToFull(InPathToGitRepo);
+	bGitRepositoryFound = GitSourceControlUtils::FindRootDirectory(PathToRepo, PathToRepositoryRoot);
+	if (bGitRepositoryFound)
+	{
+		GitSourceControlMenu.Register();
+
+		// Get branch name
+		bGitRepositoryFound = GitSourceControlUtils::GetBranchName(InPathToGitBinary, PathToRepositoryRoot, BranchName);
+		if (bGitRepositoryFound)
+		{
+			GitSourceControlUtils::GetRemoteUrl(InPathToGitBinary, PathToRepositoryRoot, RemoteUrl);
+		}
+		else
+		{
+			UE_LOG(LogSourceControl, Error, TEXT("'%s' is not a valid Git repository"), *PathToRepositoryRoot);
+		}
+	}
+	else
+	{
+		UE_LOG(LogSourceControl, Warning, TEXT("'%s' is not part of a Git repository"), *FPaths::ProjectDir());
+	}
+
+	// Get user name & email (of the repository, else from the global Git config)
+	GitSourceControlUtils::GetUserConfig(InPathToGitBinary, PathToRepositoryRoot, UserName, UserEmail);
+	return bGitRepositoryFound;
 }
 
 void FGitSourceControlProvider::CheckRepositoryStatus(const FString& InPathToGitBinary)
